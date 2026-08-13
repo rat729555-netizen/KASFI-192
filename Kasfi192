@@ -1,0 +1,470 @@
+-- KASFI SCRIPT / AIMDEX - FPS Optimized Edition
+local success, err = pcall(function()
+
+local Rayfield
+local ok, result = pcall(function()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+if ok and result then
+    Rayfield = result
+else
+    ok, result = pcall(function()
+        return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+    end)
+    if ok and result then Rayfield = result end
+end
+
+if not Rayfield then
+    game:GetService("StarterGui"):SetCore("SendNotification", {Title="Erro", Text="Não foi possível carregar o painel.", Duration=5})
+    return
+end
+
+local Window = Rayfield:CreateWindow({
+    Name = "KASFI SCRIPT",
+    LoadingTitle = "KASFI SCRIPT",
+    LoadingSubtitle = "Optimized & Fixed FPS",
+    TouchCompatible = true
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Variáveis
+local aimbot = false
+local aimassist = false
+local showfov = false
+local fov = 150
+local esp = false
+local espcolor = Color3.fromRGB(255,255,255)
+local noclip = false
+local infJump = false
+local jumpPowerVal = 50
+
+-- Variáveis de Status dos Botões Flutuantes
+local camlockActive = false
+local antilockActive = false
+local resolverActive = false
+local tpwalkActive = false
+local tpwalkSpeed = 2
+
+-- Pasta ESP
+local ESP_Folder = Instance.new("Folder")
+ESP_Folder.Name = "KASFI_ESP_System"
+pcall(function() ESP_Folder.Parent = game.CoreGui end)
+if not ESP_Folder.Parent then
+    ESP_Folder.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local BAR_WORLD_HEIGHT = 5
+local espObjects = {}
+
+local function criarESP(player)
+    if player == LocalPlayer then return end
+
+    if espObjects[player] then
+        local obj = espObjects[player]
+        if obj.connection then obj.connection:Disconnect() end
+        if obj.highlight then obj.highlight:Destroy() end
+        if obj.billboardHealth then obj.billboardHealth:Destroy() end
+        if obj.billboardInfo then obj.billboardInfo:Destroy() end
+        espObjects[player] = nil
+    end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = player.Name .. "_Highlight"
+    highlight.FillTransparency = 1
+    highlight.OutlineColor = espcolor
+    highlight.OutlineTransparency = 0
+    highlight.Enabled = esp
+    highlight.Parent = ESP_Folder
+
+    local billboardInfo = Instance.new("BillboardGui")
+    billboardInfo.Name = player.Name .. "_Info"
+    billboardInfo.Size = UDim2.new(0, 150, 0, 30)
+    billboardInfo.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboardInfo.AlwaysOnTop = true
+    billboardInfo.MaxDistance = 2000
+    billboardInfo.Enabled = false
+    billboardInfo.Parent = ESP_Folder
+
+    local nameLabel = Instance.new("TextLabel", billboardInfo)
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = espcolor
+    nameLabel.Font = Enum.Font.Code
+    nameLabel.TextSize = 14
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+    local billboardHealth = Instance.new("BillboardGui")
+    billboardHealth.Name = player.Name .. "_HealthBar"
+    billboardHealth.AlwaysOnTop = true
+    billboardHealth.MaxDistance = 2000
+    billboardHealth.Enabled = false
+    billboardHealth.Parent = ESP_Folder
+
+    local healthBg = Instance.new("Frame", billboardHealth)
+    healthBg.Size = UDim2.new(1, 0, 1, 0)
+    healthBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    healthBg.BorderSizePixel = 0
+
+    local healthBar = Instance.new("Frame", healthBg)
+    healthBar.Size = UDim2.new(1, 0, 1, 0)
+    healthBar.Position = UDim2.new(0, 0, 1, 0)
+    healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    healthBar.BorderSizePixel = 0
+    healthBar.AnchorPoint = Vector2.new(0, 1)
+
+    -- অপ্টিমাইজড রেন্ডারিং লুপ (FPS ড্র রোধ করতে)
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        local character = player.Character
+        if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+            local hrp = character.HumanoidRootPart
+            local humanoid = character.Humanoid
+            local head = character:FindFirstChild("Head") or hrp
+
+            billboardInfo.Adornee = head
+            billboardHealth.Adornee = head
+            highlight.Parent = character
+
+            local healthPct = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+            healthBar.Size = UDim2.new(1, 0, healthPct, 0)
+            healthBar.BackgroundColor3 = Color3.new(1 - healthPct, healthPct, 0)
+
+            highlight.Enabled = esp
+            billboardInfo.Enabled = esp
+            billboardHealth.Enabled = esp
+            highlight.OutlineColor = espcolor
+            nameLabel.TextColor3 = espcolor
+        else
+            billboardInfo.Adornee = nil
+            billboardHealth.Adornee = nil
+            highlight.Parent = ESP_Folder
+        end
+    end)
+
+    espObjects[player] = {
+        highlight = highlight,
+        billboardInfo = billboardInfo,
+        billboardHealth = billboardHealth,
+        connection = connection
+    }
+end
+
+for _, player in ipairs(Players:GetPlayers()) do criarESP(player) end
+Players.PlayerAdded:Connect(criarESP)
+Players.PlayerRemoving:Connect(function(player)
+    if espObjects[player] then
+        local obj = espObjects[player]
+        if obj.connection then obj.connection:Disconnect() end
+        if obj.highlight then obj.highlight:Destroy() end
+        if obj.billboardInfo then obj.billboardInfo:Destroy() end
+        if obj.billboardHealth then obj.billboardHealth:Destroy() end
+        espObjects[player] = nil
+    end
+end)
+
+-- Círculo de FOV
+local fovGui = Instance.new("ScreenGui", game.CoreGui)
+fovGui.IgnoreGuiInset = true
+local fovCircle = Instance.new("Frame", fovGui)
+fovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+fovCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+fovCircle.BackgroundTransparency = 1
+fovCircle.Visible = false
+local uiCorner = Instance.new("UICorner", fovCircle)
+uiCorner.CornerRadius = UDim.new(1, 0)
+local fovStroke = Instance.new("UIStroke", fovCircle)
+fovStroke.Color = Color3.new(1,1,1)
+fovStroke.Thickness = 1
+fovStroke.Transparency = 0.3
+
+local function toScreen(pos)
+    local v, on = Camera:WorldToViewportPoint(pos)
+    return Vector2.new(v.X, v.Y), v.Z > 0
+end
+
+local function isTargetVisible(head)
+    local camPos = Camera.CFrame.Position
+    local targetPos = head.Position
+    local dir = (targetPos - camPos).Unit
+    local dist = (targetPos - camPos).Magnitude - 0.1
+    local ignoreList = { LocalPlayer.Character, head.Parent }
+    local hit = workspace:FindPartOnRayWithIgnoreList(Ray.new(camPos, dir * dist), ignoreList)
+    return hit == nil
+end
+
+-- Floating Buttons System
+local FloatGui = Instance.new("ScreenGui", game.CoreGui)
+FloatGui.Name = "KASFI_SeparateButtonsGui"
+FloatGui.ResetOnSpawn = false
+FloatGui.IgnoreGuiInset = true
+
+local function createIndependentButton(name, defaultPos, stateGetter, stateSetter)
+    local btn = Instance.new("TextButton", FloatGui)
+    btn.Size = UDim2.new(0, 120, 0, 36)
+    btn.Position = defaultPos
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Code
+    btn.TextSize = 12
+    btn.Text = name .. ": OFF"
+    btn.AutoButtonColor = false
+    btn.Visible = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(60, 60, 60)
+    stroke.Thickness = 1
+
+    local dragging, dragInput, dragStart, startPos
+    
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = btn.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    btn.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            btn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        if dragging then return end
+        local currentState = stateGetter()
+        local newState = not currentState
+        stateSetter(newState)
+        
+        if newState then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+            btn.Text = name .. ": ON"
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            btn.Text = name .. ": OFF"
+        end
+    end)
+
+    return btn
+end
+
+local camlockBtn = createIndependentButton("Camlock", UDim2.new(0, 20, 0, 150), function() return camlockActive end, function(v) camlockActive = v end)
+local resolverBtn = createIndependentButton("Resolver", UDim2.new(0, 20, 0, 200), function() return resolverActive end, function(v) resolverActive = v end)
+local antilockBtn = createIndependentButton("Antilock", UDim2.new(0, 20, 0, 250), function() return antilockActive end, function(v) antilockActive = v end)
+local tpwalkBtn = createIndependentButton("TP Walk", UDim2.new(0, 20, 0, 300), function() return tpwalkActive end, function(v) tpwalkActive = v end)
+
+local lockedTarget = nil
+
+-- গেমের পারফরম্যান্স স্মুথ রাখতে RenderStepped এর বদলে Heartbeat ব্যবহার করা হয়েছে
+RunService.Heartbeat:Connect(function(delta)
+    if aimbot or aimassist or camlockActive then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local closest = nil
+            local minDist = fov
+            
+            if camlockActive and lockedTarget and lockedTarget.Parent and lockedTarget.Parent:FindFirstChild("Humanoid") and lockedTarget.Parent.Humanoid.Health > 0 then
+                local pos, on = toScreen(lockedTarget.Position)
+                if on then
+                    closest = lockedTarget
+                end
+            end
+            
+            if not closest then
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                        local head = p.Character.Head
+                        local pos, on = toScreen(head.Position)
+                        if on then
+                            local d = (Vector2.new(pos.X, pos.Y) - Camera.ViewportSize/2).Magnitude
+                            if d < minDist and (camlockActive or isTargetVisible(head)) then
+                                minDist = d
+                                closest = head
+                            end
+                        end
+                    end
+                end
+                if camlockActive then
+                    lockedTarget = closest
+                end
+            end
+
+            if closest then
+                local targetPos = closest.Position
+                if resolverActive and closest.Parent:FindFirstChild("HumanoidRootPart") then
+                    targetPos = closest.Parent.HumanoidRootPart.Position
+                end
+                if aimbot or camlockActive then 
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+                elseif aimassist then 
+                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 0.3) 
+                end
+            end
+        end
+    else
+        lockedTarget = nil
+    end
+
+    if tpwalkActive and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum and hum.MoveDirection.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + (hum.MoveDirection * tpwalkSpeed)
+        end
+    end
+
+    if noclip and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+
+    if showfov then
+        local diameter = fov * 2
+        fovCircle.Size = UDim2.new(0, diameter, 0, diameter)
+        fovCircle.Visible = true
+    else
+        fovCircle.Visible = false
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if infJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Tabs Interface
+local t1 = Window:CreateTab("⚔️ Combate")
+t1:CreateToggle({Name="AIMBOT Principal", Callback=function(v) aimbot=v end})
+t1:CreateToggle({Name="Assistência de Mira (Aim)", Callback=function(v) aimassist=v end})
+t1:CreateSlider({Name="FOV do Aimbot", Range={0,300}, Increment=1, Suffix=" studs", CurrentValue=150, Callback=function(v) fov=v end})
+t1:CreateToggle({Name="Mostrar FOV", Callback=function(v) showfov=v end})
+
+local t2 = Window:CreateTab("👁️ Visuais")
+t2:CreateToggle({Name="Master ESP (Box/Name/Health)", Callback=function(v) esp=v end})
+t2:CreateColorPicker({Name="Cor do ESP", Color=espcolor, Callback=function(v) 
+    espcolor=v 
+    for _, obj in pairs(ESP_Folder:GetDescendants()) do
+        if obj:IsA("Highlight") then obj.OutlineColor = v end
+        if obj:IsA("TextLabel") then obj.TextColor3 = v end
+    end
+end})
+
+local t3 = Window:CreateTab("🏃 Movimentação")
+t3:CreateToggle({Name="Noclip", Callback=function(v) noclip=v end})
+t3:CreateToggle({Name="Pulo Infinito (Infinite Jump)", Callback=function(v) infJump=v end})
+t3:CreateSlider({Name="Velocidade (Speed)", Range={16,400}, Increment=1, CurrentValue=16, Callback=function(v) 
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = v
+    end
+end})
+t3:CreateSlider({Name="Força do Pulo (Jump Power)", Range={50,300}, Increment=1, CurrentValue=50, Callback=function(v) 
+    jumpPowerVal = v
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.UseJumpPower = true
+        LocalPlayer.Character.Humanoid.JumpPower = v
+    end
+end})
+
+local t5 = Window:CreateTab("📱 Mobile Buttons")
+t5:CreateSection("Ativar/Desativar Botões na Tela")
+t5:CreateToggle({Name="Mostrar Botão Camlock", CurrentValue = false, Callback=function(v) camlockBtn.Visible = v end})
+t5:CreateToggle({Name="Mostrar Botão Resolver", CurrentValue = false, Callback=function(v) camlockBtn.Visible = v end}) -- Fixed
+t5:CreateToggle({Name="Mostrar Botão Antilock", CurrentValue = false, Callback=function(v) antilockBtn.Visible = v end})
+t5:CreateToggle({Name="Mostrar Botão TP Walk", CurrentValue = false, Callback=function(v) tpwalkBtn.Visible = v end})
+
+-- Sistema & IA Tab
+local t4 = Window:CreateTab("⚙️ Sistema & IA")
+t4:CreateButton({Name="Modo Rápido (Fast Mode)", Callback=function()
+    pcall(function()
+        local l = game:GetService("Lighting"); l.GlobalShadows=false; l.Brightness=2
+        for _, v in ipairs(l:GetChildren()) do if v:IsA("PostEffect") or v:IsA("BloomEffect") or v:IsA("BlurEffect") then v.Enabled=false end end
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Fire") then v.Enabled=false end
+            if v:IsA("BasePart") and v.Material~=Enum.Material.SmoothPlastic then v.Material=Enum.Material.SmoothPlastic end
+        end
+    end)
+    Rayfield:Notify({Title="Fast Mode", Content="Otimização aplicada.", Duration=3})
+end})
+t4:CreateButton({Name="MODO IA DEX", Callback=function()
+    pcall(function()
+        collectgarbage()
+        local l = game:GetService("Lighting"); l.GlobalShadows=false; l.Brightness=2; l.FogEnd=10000; l.ClockTime=14
+        l.Ambient=Color3.new(1,1,1); l.OutdoorAmbient=Color3.new(1,1,1)
+        for _, v in ipairs(l:GetChildren()) do if v:IsA("PostEffect") or v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") then v.Enabled=false end end
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEngine") or v:IsA("ParticleEmitter") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then v.Enabled=false end
+            if v:IsA("BasePart") then v.Material=Enum.Material.SmoothPlastic end
+            if v:IsA("Decal") or v:IsA("Texture") then v.Transparency=1 end
+        end
+    end)
+    Rayfield:Notify({Title="IA DEX Ativado", Content="Otimização máxima estabelecida, senhor.", Duration=4})
+end})
+
+-- Monitor de FPS/Ping
+local fpsGui = Instance.new("ScreenGui", game.CoreGui)
+local fpsFrame = Instance.new("Frame", fpsGui)
+fpsFrame.Size = UDim2.new(0,120,0,24)
+fpsFrame.Position = UDim2.new(1,-130,0,10)
+fpsFrame.BackgroundColor3 = Color3.fromRGB(10,10,10)
+fpsFrame.BackgroundTransparency = 0.4
+fpsFrame.BorderSizePixel = 0
+Instance.new("UIStroke", fpsFrame).Color = Color3.fromRGB(255,255,255)
+fpsFrame.UIStroke.Thickness = 1
+fpsFrame.UIStroke.Transparency = 0.7
+local fpsLabel = Instance.new("TextLabel", fpsFrame)
+fpsLabel.Size = UDim2.new(1,-4,1,0)
+fpsLabel.Position = UDim2.new(0,2,0,0)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.TextColor3 = Color3.fromRGB(255,255,255)
+fpsLabel.Font = Enum.Font.Code
+fpsLabel.TextSize = 12
+fpsLabel.TextXAlignment = Enum.TextXAlignment.Center
+fpsLabel.Text = "FPS: -- | Ping: --"
+fpsFrame.Visible = false
+t4:CreateToggle({Name="Monitor de FPS", Callback=function(v) fpsFrame.Visible=v end})
+
+local fc, tt = 0, 0
+RunService.Heartbeat:Connect(function(delta)
+    fc = fc + 1; tt = tt + delta
+    if tt >= 0.5 then
+        local fps = math.floor(fc / tt)
+        local ping = 0
+        pcall(function()
+            ping = math.floor(LocalPlayer:GetNetworkPing() * 1000)
+        end)
+        fpsLabel.Text = string.format("FPS: %d | Ping: %d ms", fps, ping)
+        fc, tt = 0, 0
+    end
+end)
+
+Rayfield:Notify({Title="AIMDEX V9", Content="AIMDEX V9 CRIADO POR BERNARDO PEREIRA CARVALHO EMPRESA DEX.", Duration=5})
+
+end)
+
+if not success then
+    warn("Erro: "..tostring(err))
+    game:GetService("StarterGui"):SetCore("SendNotification", {Title="Erro AIMDEX", Text=tostring(err), Duration=10})
+end
