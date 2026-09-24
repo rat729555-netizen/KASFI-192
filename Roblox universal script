@@ -1,0 +1,271 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "MM2 Lite Hub [Rayfield]",
+   LoadingTitle = "Loading...",
+   LoadingSubtitle = "by Custom",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false,
+})
+
+local Tab = Window:CreateTab("Main", 4483362458)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local currentSpeed = 16
+local currentJump = 50
+local noclipEnabled = false
+local outlineEnabled = false
+local tracersEnabled = false
+local namesEnabled = false
+local infJump = false
+
+local char, hum, rootPart
+local function setupCharacter(c)
+   char = c
+   hum = c:WaitForChild("Humanoid")
+   rootPart = c:WaitForChild("HumanoidRootPart")
+   hum.WalkSpeed = currentSpeed
+   hum.UseJumpPower = true
+   hum.JumpPower = currentJump
+end
+
+if LocalPlayer.Character then setupCharacter(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(setupCharacter)
+
+local tracersTable = {}
+local namesTable = {}
+
+local function removeTracer(p)
+   if tracersTable[p] then
+      tracersTable[p]:Remove()
+      tracersTable[p] = nil
+   end
+end
+
+local function removeName(p)
+   if namesTable[p] then
+      namesTable[p]:Remove()
+      namesTable[p] = nil
+   end
+end
+
+-- সুপার লাইটওয়েট লুপ: স্পিড, জাম্প, আউটলাইন, ট্র্যাকার, নেম ইএসপি এবং অ্যান্টি-ভয়েড (মাটির নিচে যাওয়া রোধ) হ্যান্ডেল করার জন্য
+RunService.Heartbeat:Connect(function()
+   -- ১. স্পিড ও জাম্প লক ও ফিক্স রাখা
+   if hum then
+      if currentSpeed > 16 and hum.WalkSpeed ~= currentSpeed then
+         hum.WalkSpeed = currentSpeed
+      end
+      if hum.UseJumpPower == false or hum.JumpPower ~= currentJump then
+         hum.UseJumpPower = true
+         hum.JumpPower = currentJump
+      end
+   end
+
+   -- ২. অ্যান্টি-ভয়েড সেফটি (মাটির নিচে বা Void-এ ঢুকে গেলে বাঁচানোর জন্য)
+   if rootPart and rootPart.Position.Y < -50 then
+      rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 100, 0)
+      if hum then hum.Sit = false end
+   end
+
+   -- ৩. সবার জন্য আউটলাইন ফিক্স
+   for _, p in pairs(Players:GetPlayers()) do
+      if p ~= LocalPlayer and p.Character then
+         local hl = p.Character:FindFirstChild("RayfieldOutline")
+         if outlineEnabled then
+            if not hl then
+               local h = Instance.new("Highlight")
+               h.Name = "RayfieldOutline"
+               h.Adornee = p.Character
+               h.FillTransparency = 1
+               h.OutlineColor = Color3.fromRGB(0, 255, 0)
+               h.OutlineTransparency = 0.2
+               h.Parent = p.Character
+            end
+         else
+            if hl then hl:Destroy() end
+         end
+      end
+   end
+
+   -- ৪. তোর পছন্দের ট্র্যাকার লাইন (Tracers) - একদম অক্ষত রাখা হয়েছে
+   for _, p in pairs(Players:GetPlayers()) do
+      if p ~= LocalPlayer then
+         if tracersEnabled and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            if not tracersTable[p] then
+               local line = Drawing.new("Line")
+               line.Thickness = 1.5
+               line.Color = Color3.fromRGB(0, 255, 0)
+               line.Transparency = 0.7
+               tracersTable[p] = line
+            end
+            
+            local hrp = p.Character.HumanoidRootPart
+            local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            
+            if onScreen then
+               local line = tracersTable[p]
+               line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+               line.To = Vector2.new(vector.X, vector.Y)
+               line.Visible = true
+            else
+               if tracersTable[p] then tracersTable[p].Visible = false end
+            end
+         else
+            removeTracer(p)
+         end
+      end
+   end
+
+   -- ৫. Player Names (নেম ইএসপি) ফিচার
+   for _, p in pairs(Players:GetPlayers()) do
+      if p ~= LocalPlayer then
+         if namesEnabled and p.Character and p.Character:FindFirstChild("Head") then
+            if not namesTable[p] then
+               local txt = Drawing.new("Text")
+               txt.Size = 14
+               txt.Center = true
+               txt.Outline = true
+               txt.Color = Color3.fromRGB(255, 255, 255)
+               namesTable[p] = txt
+            end
+            
+            local head = p.Character.Head
+            local vector, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
+            
+            if onScreen then
+               local txt = namesTable[p]
+               txt.Text = p.Name
+               txt.Position = Vector2.new(vector.X, vector.Y)
+               txt.Visible = true
+            else
+               if namesTable[p] then namesTable[p].Visible = false end
+            end
+         else
+            removeName(p)
+         end
+      end
+   end
+end)
+
+-- ৬. Noclip (দেওয়ালের এপার-ওপার যাওয়ার জন্য)
+RunService.Stepped:Connect(function()
+   if noclipEnabled and char then
+      for _, v in pairs(char:GetDescendants()) do
+         if v:IsA("BasePart") then 
+            v.CanCollide = false 
+         end
+      end
+   end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+   removeTracer(p)
+   removeName(p)
+end)
+
+-- 1. WalkSpeed Slider (১৬ থেকে ৪০০)
+Tab:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {16, 400},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "SpeedSlider",
+   Callback = function(Value)
+      currentSpeed = Value
+      if hum then hum.WalkSpeed = Value end
+   end,
+})
+
+-- 2. JumpPower Slider (৫০ থেকে ৪০০ - ফিক্সড)
+Tab:CreateSlider({
+   Name = "JumpPower",
+   Range = {50, 400},
+   Increment = 1,
+   Suffix = "Power",
+   CurrentValue = 50,
+   Flag = "JumpSlider",
+   Callback = function(Value)
+      currentJump = Value
+      if hum then 
+         hum.UseJumpPower = true
+         hum.JumpPower = Value 
+      end
+   end,
+})
+
+Tab:CreateDivider()
+
+-- 3. Infinite Jump Toggle
+Tab:CreateToggle({
+   Name = "Infinite Jump",
+   CurrentValue = false,
+   Flag = "InfJumpFlag",
+   Callback = function(Value)
+      infJump = Value
+   end,
+})
+
+UserInputService.JumpRequest:Connect(function()
+   if infJump and hum then
+      hum:ChangeState(Enum.HumanoidStateType.Jumping)
+   end
+end)
+
+-- 4. Noclip Toggle
+Tab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Flag = "NoclipFlag",
+   Callback = function(Value)
+      noclipEnabled = Value
+   end,
+})
+
+Tab:CreateDivider()
+
+-- 5. Outline Toggle (ফিক্সড)
+Tab:CreateToggle({
+   Name = "Outline",
+   CurrentValue = false,
+   Flag = "OutlineFlag",
+   Callback = function(Value)
+      outlineEnabled = Value
+   end,
+})
+
+-- 6. Tracers Toggle (যেমন ছিল তেমনই আছে)
+Tab:CreateToggle({
+   Name = "Tracers",
+   CurrentValue = false,
+   Flag = "TracersFlag",
+   Callback = function(Value)
+      tracersEnabled = Value
+      if not Value then
+         for _, p in pairs(Players:GetPlayers()) do
+            removeTracer(p)
+         end
+      end
+   end,
+})
+
+-- 7. Names Toggle (নাম দেখানোর ফিচার)
+Tab:CreateToggle({
+   Name = "Names",
+   CurrentValue = false,
+   Flag = "NamesFlag",
+   Callback = function(Value)
+      namesEnabled = Value
+      if not Value then
+         for _, p in pairs(Players:GetPlayers()) do
+            removeName(p)
+         end
+      end
+   end,
+})
